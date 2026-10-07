@@ -1,0 +1,265 @@
+/* CSS reset and base styles */
+:root {
+    --bg-color: #f8f9fa;
+    --sidebar-bg: #0a2540;
+    --sidebar-text: #e6e9ef;
+    --sidebar-hover: #0055a4;
+    --text-main: #333333;
+    --heading-color: #0a2540;
+    --accent: #0073e6;
+    --card-bg: #ffffff;
+    --code-bg: #282a36; /* Dracula style */
+    --border-color: #eaeaea;
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Inter', 'Roboto', sans-serif;
+    background-color: var(--bg-color);
+    color: var(--text-main);
+    line-height: 1.6;
+    display: flex;
+}
+
+/* Sidebar */
+.sidebar {
+    width: 280px;
+    height: 100vh;
+    background-color: var(--sidebar-bg);
+    color: var(--sidebar-text);
+    position: fixed;
+    top: 0;
+    left: 0;
+    overflow-y: auto;
+    transition: transform 0.3s ease;
+    z-index: 1000;
+}
+
+.sidebar-header {
+    padding: 30px 20px;
+    background-color: rgba(0,0,0,0.2);
+    text-align: center;
+}
+
+.sidebar-header h2 {
+    font-size: 1.5rem;
+    margin-bottom: 5px;
+    color: #fff;
+}
+
+.sidebar-header p {
+    font-size: 0.9rem;
+    color: #a0aec0;
+}
+
+.nav-links {
+    list-style: none;
+    padding: 20px 0;
+}
+
+.nav-links li a {
+    display: block;
+    padding: 12px 20px;
+    color: var(--sidebar-text);
+    text-decoration: none;
+    font-weight: 500;
+    border-left: 4px solid transparent;
+    transition: all 0.2s;
+}
+
+.nav-links li a:hover,
+.nav-links li a.active {
+    background-color: rgba(255,255,255,0.1);
+    border-left-color: var(--accent);
+    color: #fff;
+}
+
+/* Main Content */
+.content {
+    margin-left: 280px;
+    padding: 40px;
+    width: calc(100% - 280px);
+    max-width: 1000px;
+}
+
+.section {
+    background: var(--card-bg);
+    padding: 40px;
+    border-radius: 10px;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+    margin-bottom: 40px;
+}
+
+h1, h2, h3, h4 {
+    color: var(--heading-color);
+    margin-top: 1.5em;
+    margin-bottom: 0.8em;
+}
+
+h1 {
+    font-size: 2.5rem;
+    margin-top: 0;
+    color: var(--accent);
+}
+
+h2 {
+    font-size: 2rem;
+    border-bottom: 2px solid var(--border-color);
+    padding-bottom: 10px;
+}
+
+h3 {
+    font-size: 1.4rem;
+    color: var(--accent);
+}
+
+p, ul, ol {
+    margin-bottom: 1.5em;
+}
+
+ul, ol {
+    padding-left: 1.5em;
+}
+
+li {
+    margin-bottom: 0.5em;
+}
+
+/* Stylisation stricte : distinction Inline Code vs Pre Code */
+:not(pre) > code {
+    background-color: #e9ecef;
+    padding: 3px 6px;
+    border-radius: 4px;
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 0.9em;
+    color: #d63384; /* Texte foncé sur fond clair */
+}
+
+pre {
+    position: relative;
+    background-color: var(--code-bg) !important;
+    padding: 20px !important;
+    border-radius: 8px !important;
+    overflow-x: auto;
+    margin-bottom: 1.5em;
+    border: 1px solid rgba(255,255,255,0.1);
+}
+
+/* On force Prism à respecter un texte clair pour tout le bloc s'il n'est pas colorisé */
+pre, pre code {
+    color: #f8f8f2 !important; 
+    text-shadow: none !important;
+}
+
+/* Copy Button inside pre */
+.copy-btn {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    background-color: rgba(255,255,255,0.1);
+    color: #fff;
+    border: 1px solid rgba(255,255,255,0.2);
+    padding: 5px 10px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.8rem;
+    transition: all 0.2s;
+    z-index: 10;
+}
+
+.copy-btn:hover {
+    background-color: rgba(255,255,255,0.2);
+}
+
+/* Images */
+.infography {
+    margin: 2em 0;
+    text-align: center;
+}
+
+.infography img {
+    max-width: 100%;
+    border-radius: 8px;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+}
+
+.infography figcaption {
+    margin-top: 10px;
+    font-style: italic;
+    color: #666;
+}
+
+/* Script cards */
+.script-card {
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 20px;
+    margin-bottom: 20px;
+}
+
+.script-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+}
+
+.script-header h3 {
+    margin: 0;
+}
+
+.btn-download {
+    background-color: var(--accent);
+    color: #fff;
+    padding: 8px 15px;
+    border-radius: 5px;
+    text-decoration: none;
+    font-size: 0.9rem;
+    font-weight: 600;
+    transition: background 0.2s;
+}
+
+.btn-download:hover {
+    background-color: #0055a4;
+}
+
+/* Mobile Responsive */
+.menu-toggle {
+    display: none;
+    position: fixed;
+    top: 15px;
+    left: 15px;
+    background-color: var(--sidebar-bg);
+    color: #fff;
+    border: none;
+    padding: 10px 15px;
+    border-radius: 5px;
+    z-index: 1001;
+    cursor: pointer;
+    font-weight: bold;
+}
+
+@media (max-width: 768px) {
+    .sidebar {
+        transform: translateX(-100%);
+    }
+    
+    .sidebar.open {
+        transform: translateX(0);
+    }
+    
+    .content {
+        margin-left: 0;
+        width: 100%;
+        padding: 60px 20px 20px;
+    }
+    
+    .menu-toggle {
+        display: block;
+    }
+}

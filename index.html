@@ -1,0 +1,586 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Documentation Active Directory - Production</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <!-- Prism.js for syntax highlighting -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet" />
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <button class="menu-toggle" id="menu-toggle">☰ Menu</button>
+    <nav class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <h2>Projet AD DS</h2>
+            <p>Déploiement Multi-Forêts</p>
+        </div>
+        <ul class="nav-links">
+            <li><a href="#accueil" class="active">Accueil</a></li>
+            <li><a href="#partie-1">Partie 1 : Préparation réseau</a></li>
+            <li><a href="#partie-2">Partie 2 : Promotion AD DS</a></li>
+            <li><a href="#partie-3">Partie 3 : Arborescence & Utilisateurs</a></li>
+            <li><a href="#partie-4">Partie 4 : Partages & AGDLP</a></li>
+            <li><a href="#partie-5">Partie 5 : Délégations de Contrôle</a></li>
+            <li><a href="#partie-6">Partie 6 : Stratégies de Groupes</a></li>
+            <li><a href="#partie-7">Partie 7 : Relation d'Approbation</a></li>
+            <li><a href="#partie-8">Partie 8 : Étude de cas</a></li>
+            <li><a href="#scripts">Téléchargement des Scripts</a></li>
+        </ul>
+    </nav>
+
+    <main class="content">
+        <section id="accueil" class="section">
+            <h1>Documentation Active Directory</h1>
+            <p>Bienvenue sur la documentation technique officielle documentant un déploiement Active Directory multi-forêts en environnement de production.</p>
+            <figure class="infography">
+                <img src="image.jpeg" alt="Architecture de déploiement multi-forêts">
+                <figcaption>Architecture de déploiement multi-forêts</figcaption>
+            </figure>
+        </section>
+
+        <section id="partie-1" class="section">
+            <h2>Partie 1 : Préparation et Réseau</h2>
+            <p>La phase de préparation fige l'identité réseau des serveurs avant la promotion Active Directory. Une erreur sur le masque ou la passerelle compromettra la communication entre les différents pôles lors de la mise en production.</p>
+            
+            <h3>Méthode 1 : Interface Graphique (Siège Social - SRV-AD-01)</h3>
+            <p>Ce serveur nécessite une configuration complète via les menus de Windows pour héberger le domaine <code>domaine-a.local</code>.</p>
+            <ol>
+                <li><strong>Renommage de la machine :</strong> Appuyez sur les touches <strong>Windows + R</strong>, tapez <code>sysdm.cpl</code> et appuyez sur Entrée. Dans l'onglet <strong>Nom de l'ordinateur</strong>, cliquez sur le bouton <strong>Modifier</strong>. Effacez le nom généré aléatoirement, tapez exactement <code>SRV-AD-01</code>, validez par <strong>OK</strong> et fermez la fenêtre en ignorant la demande de redémarrage immédiat.</li>
+                <li><strong>Accès aux connexions réseau :</strong> Appuyez de nouveau sur <strong>Windows + R</strong>, tapez <code>ncpa.cpl</code> et validez. Faites un clic droit sur votre carte réseau et sélectionnez <strong>Propriétés</strong>.</li>
+                <li><strong>Configuration IP :</strong> Double-cliquez sur <strong>Protocole Internet version 4 (TCP/IPv4)</strong>. Cochez l'option <strong>Utiliser l'adresse IP suivante</strong>.</li>
+                <li><strong>Saisie des paramètres :</strong> Saisissez l'adresse IP, le masque de sous-réseau et la passerelle par défaut correspondants à votre plan d'adressage.</li>
+                <li><strong>Configuration DNS :</strong> Dans la partie inférieure de la fenêtre, cochez <strong>Utiliser l'adresse de serveur DNS suivante</strong>. Dans la case <strong>Serveur DNS préféré</strong>, tapez <code>127.0.0.1</code> (l'adresse de boucle locale, car ce serveur hébergera son propre service DNS).</li>
+                <li><strong>Validation :</strong> Cliquez sur <strong>OK</strong> deux fois pour appliquer les paramètres réseau, puis redémarrez manuellement le serveur depuis le menu Démarrer pour que le nouveau nom NetBIOS soit pris en compte.</li>
+            </ol>
+
+            <h3>Méthode 2 : Server Core (Filiale - SRV-AD-02-CORE)</h3>
+            <p>Ce serveur, dépourvu d'interface graphique, hébergera la forêt <code>filiale-b.local</code>. La configuration TCP/IP s'effectue intégralement en PowerShell pour un contrôle précis des paramètres de la carte réseau.</p>
+            <ol>
+                <li><strong>Basculement d'environnement :</strong> Dans l'invite de commande noire qui s'affiche à l'ouverture de session, tapez simplement le mot <code>powershell</code> et appuyez sur Entrée. Un préfixe <code>PS</code> s'affiche à gauche de la ligne de commande.</li>
+                <li><strong>Renommage du serveur :</strong> Exécutez la commande <code>Rename-Computer -NewName "SRV-AD-02-CORE"</code>.</li>
+                <li><strong>Identification de la carte réseau :</strong> Tapez <code>Get-NetAdapter</code> et repérez le chiffre indiqué dans la colonne <code>ifIndex</code> (généralement 2 ou 3).</li>
+                <li><strong>Attribution de l'adresse IP :</strong> Exécutez la commande suivante en renseignant les paramètres réseau de votre environnement (adaptez l'Index, l'IP, le masque et la passerelle) :
+<pre><code class="language-powershell">New-NetIPAddress -InterfaceIndex 2 -IPAddress 192.168.x.x -PrefixLength 20 -DefaultGateway 192.168.x.x</code></pre>
+                </li>
+                <li><strong>Paramétrage du DNS local :</strong> Indiquez au serveur de se questionner lui-même en exécutant :
+<pre><code class="language-powershell">Set-DnsClientServerAddress -InterfaceIndex 2 -ServerAddresses "127.0.0.1"</code></pre>
+                </li>
+                <li><strong>Application et redémarrage :</strong> Tapez <code>Restart-Computer</code> et validez pour redémarrer la machine et appliquer le nom de serveur de manière permanente.</li>
+            </ol>
+        </section>
+
+        <section id="partie-2" class="section">
+            <h2>Partie 2 : Promotion AD DS</h2>
+            <p>L'étape de promotion transforme vos serveurs autonomes en Contrôleurs de Domaine, créant ainsi deux forêts distinctes (ex: <code>domaine-a.local</code> et <code>filiale-b.local</code>). Cette phase installe la base de données Active Directory (NTDS) et le dossier partagé de réplication (SYSVOL).</p>
+
+            <h3>Méthode 1 : Interface Graphique (Siège Social - SRV-AD-01)</h3>
+            <p>Pour ce serveur disposant d'un environnement de bureau, l'opération s'effectue en deux temps : l'installation des binaires du rôle, puis la configuration de la forêt.</p>
+            
+            <h4>Étape A : Installation du rôle AD DS</h4>
+            <ol>
+                <li>Connectez-vous à la session avec le compte administrateur local. Ouvrez le <strong>Gestionnaire de serveur</strong>.</li>
+                <li>En haut à droite, cliquez sur le menu <strong>Gérer</strong>, puis sélectionnez <strong>Ajouter des rôles et des fonctionnalités</strong>.</li>
+                <li>Passez la page d'accueil en cliquant sur <strong>Suivant</strong> jusqu'à la sélection des rôles.</li>
+                <li>Dans la liste des rôles, cochez la case <strong>Services AD DS</strong> (Active Directory Domain Services).</li>
+                <li>Une fenêtre pop-up apparaît vous proposant d'ajouter des outils associés (notamment la console de gestion). Cliquez sur <strong>Ajouter des fonctionnalités</strong>, puis sur <strong>Suivant</strong>.</li>
+                <li>Sur l'écran de confirmation, cliquez sur <strong>Installer</strong>. L'installation des binaires va prendre quelques minutes. <em>Ne fermez pas la fenêtre une fois terminé.</em></li>
+            </ol>
+
+            <h4>Étape B : Promotion en Contrôleur de domaine</h4>
+            <ol>
+                <li>Une fois l'installation réussie, un lien bleu apparaît dans la même fenêtre : cliquez sur <strong>Promouvoir ce serveur en contrôleur de domaine</strong>.</li>
+                <li>L'Assistant Configuration des services de domaine s'ouvre. Cochez l'option : <strong>Ajouter une nouvelle forêt</strong>.</li>
+                <li>Dans le champ <strong>Nom de domaine racine</strong>, saisissez le nom de votre domaine (ex: <code>domaine-a.local</code>) et faites <strong>Suivant</strong>.</li>
+                <li>Saisissez un mot de passe complexe de restauration des services d'annuaire (DSRM) dans les deux champs, puis faites <strong>Suivant</strong>.</li>
+                <li>Un avertissement concernant la délégation DNS peut apparaître, ignorez-le et faites <strong>Suivant</strong>.</li>
+                <li>Le nom NetBIOS du domaine va se générer tout seul. Laissez-le tel quel et faites <strong>Suivant</strong>.</li>
+                <li>L'assistant vous indique les chemins des dossiers NTDS et SYSVOL. Cliquez sur <strong>Suivant</strong>.</li>
+                <li>L'assistant lance une vérification des prérequis. Cliquez sur <strong>Installer</strong>.</li>
+                <li>Le serveur va configurer l'Active Directory puis <strong>redémarrer automatiquement</strong>. Au retour, connectez-vous avec vos nouveaux identifiants de domaine (ex: <code>DOMAINE-A\Administrateur</code>).</li>
+            </ol>
+
+            <h3>Méthode 2 : Server Core (Filiale - SRV-AD-02-CORE)</h3>
+            <p>Sur la version Core, cette double opération (installation des binaires + promotion) s'effectue en seulement trois lignes de commandes PowerShell. L'objectif est de créer la forêt de la filiale.</p>
+            <ol>
+                <li><strong>Vérification de l'environnement :</strong> Assurez-vous d'avoir le préfixe <code>PS</code> dans votre console noire.</li>
+                <li><strong>Installation des binaires du rôle AD DS :</strong>
+<pre><code class="language-powershell">Install-WindowsFeature -Name AD-Domain-Services -IncludeManagementTools</code></pre>
+                </li>
+                <li><strong>Préparation du mot de passe DSRM :</strong> Vous devez convertir le mot de passe DSRM en une chaîne sécurisée (SecureString). Tapez exactement ceci :
+<pre><code class="language-powershell">$pwd = ConvertTo-SecureString "&lt;MotDePasseComplexe&gt;" -AsPlainText -Force</code></pre>
+                </li>
+                <li><strong>Lancement de la promotion de la forêt :</strong> Exécutez la commande de création de forêt. L'argument <code>-Force</code> valide automatiquement les avertissements de prérequis :
+<pre><code class="language-powershell">Install-ADDSForest -DomainName "filiale-b.local" -SafeModeAdministratorPassword $pwd -InstallDns -Force</code></pre>
+                </li>
+                <li><strong>Redémarrage et reconnexion :</strong> Le serveur va redémarrer brutalement. À l'écran d'accueil, connectez-vous avec vos nouveaux identifiants (ex: <code>FILIALE-B\Administrateur</code>).</li>
+            </ol>
+        </section>
+
+        <section id="partie-3" class="section">
+            <h2>Partie 3 : Arborescence et Utilisateurs</h2>
+            <p>Les bonnes pratiques d'administration exigent l'utilisation de scripts PowerShell pour la création en masse des objets utilisateurs. L'arborescence (les Unités d'Organisation ou OU) doit être construite de manière stratégique pour faciliter les futures délégations de droits et l'application ciblée des stratégies de groupe (GPO).</p>
+            
+            <h3>Méthode 1 : Script PowerShell interactif (Siège Social)</h3>
+            <p>Pour le siège social, vous pouvez regrouper les OUs par départements ou services métier.</p>
+            <p>Ouvrez <strong>Windows PowerShell ISE</strong> (en tant qu'administrateur). Cet outil vous permet d'éditer facilement l'intégralité de votre script avant de l'exécuter.</p>
+            <ol>
+                <li><strong>Création de l'arborescence et des groupes :</strong> Copiez ce script dans la fenêtre d'édition pour générer l'architecture.
+<pre><code class="language-powershell">$Dom = "DC=domaine-a,DC=local"
+
+# Création de l'OU racine et des OUs pour chaque département
+New-ADOrganizationalUnit -Name "Entreprise_A" -Path $Dom
+$Departements = @("Ventes", "Marketing", "RH", "IT", "Direction")
+
+foreach ($Dept in $Departements) {
+    New-ADOrganizationalUnit -Name $Dept -Path "OU=Entreprise_A,$Dom"
+    # Création du groupe global associé
+    New-ADGroup -Name "GG_$Dept" -SamAccountName "GG_$Dept" -GroupCategory Security -GroupScope Global -Path "OU=$Dept,OU=Entreprise_A,$Dom"
+}
+
+# Création des groupes transverses (ex: Comités)
+New-ADGroup -Name "GG_Comite_Direction" -SamAccountName "GG_Comite_Direction" -GroupCategory Security -GroupScope Global -Path "OU=Entreprise_A,$Dom"</code></pre>
+                </li>
+                <li><strong>Création automatisée des utilisateurs :</strong> Ajoutez la logique de création. L'argument <code>-AccountPassword</code> utilise une variable sécurisée.
+<pre><code class="language-powershell">$Pwd = ConvertTo-SecureString "&lt;MotDePasseComplexe&gt;" -AsPlainText -Force
+
+# Exemple de création d'un employé IT
+New-ADUser -Name "Jean Administrateur" -SamAccountName "jadmin" -AccountPassword $Pwd -Enabled $true -Path "OU=IT,OU=Entreprise_A,$Dom"
+Add-ADGroupMember -Identity "GG_IT" -Members "jadmin"
+
+# Exemple de création d'un directeur
+New-ADUser -Name "Julie Directrice" -SamAccountName "jdirectrice" -AccountPassword $Pwd -Enabled $true -Path "OU=Direction,OU=Entreprise_A,$Dom"
+Add-ADGroupMember -Identity "GG_Direction" -Members "jdirectrice"
+Add-ADGroupMember -Identity "GG_Comite_Direction" -Members "jdirectrice"</code></pre>
+                </li>
+                <li>Cliquez sur le bouton <strong>Exécuter le script</strong> (la flèche verte ou F5). Allez ensuite dans la console <em>Utilisateurs et ordinateurs Active Directory</em> pour constater que votre arborescence est parfaitement en place.</li>
+            </ol>
+
+            <h3>Méthode 2 : Déploiement de script sur Server Core (Filiale)</h3>
+            <p>Pour la filiale, vous pouvez déployer les objets directement via script distant ou local. L'enjeu majeur est parfois d'appliquer des restrictions horaires strictes. Sur Server Core, vous devez convertir les plages horaires en tableau d'octets binaire.</p>
+            <ol>
+                <li><strong>Le script PowerShell :</strong>
+<pre><code class="language-powershell">$Dom = "DC=filiale-b,DC=local"
+$Pwd = ConvertTo-SecureString "&lt;MotDePasseComplexe&gt;" -AsPlainText -Force
+
+# Arborescence
+New-ADOrganizationalUnit -Name "Filiale" -Path $Dom
+$Groupes = @("GG_Employes", "GG_Externes")
+foreach ($G in $Groupes) {
+    New-ADGroup -Name $G -SamAccountName $G -GroupCategory Security -GroupScope Global -Path "OU=Filiale,$Dom"
+}
+
+# Définition du tableau d'octets pour les restrictions horaires
+# 207 = Accès autorisé de 8h à 12h et de 14h à 16h (11001111 en binaire)
+# 7 = Accès autorisé de 16h à 19h (111 en binaire)
+[byte[]]$HorairesRestreints = @(
+    0, 0, 0,       # Dimanche : Fermé
+    0, 207, 7,     # Lundi : 8h-12h et 14h-19h
+    0, 207, 7,     # Mardi : 8h-12h et 14h-19h
+    0, 207, 7,     # Mercredi : 8h-12h et 14h-19h
+    0, 207, 7,     # Jeudi : 8h-12h et 14h-19h
+    0, 207, 7,     # Vendredi : 8h-12h et 14h-19h
+    0, 207, 0      # Samedi : 8h-12h et 14h-16h
+)
+
+# Création de l'utilisateur avec restriction
+New-ADUser -Name "Paul Externe" -SamAccountName "pexterne" -AccountPassword $Pwd -Enabled $true -Path "OU=Filiale,$Dom"
+Set-ADUser -Identity "pexterne" -Replace @{logonHours=$HorairesRestreints}
+Add-ADGroupMember -Identity "GG_Externes" -Members "pexterne"</code></pre>
+                </li>
+                <li><strong>Exécution sur le Core :</strong> Lancez le script en tapant son chemin absolu. Les objets seront instantanément créés avec les restrictions requises.</li>
+            </ol>
+        </section>
+
+        <section id="partie-4" class="section">
+            <h2>Partie 4 : Partages Réseaux et Sécurité (Méthode AGDLP)</h2>
+            <p>Les exigences de production requièrent souvent la mise en place de partages de fichiers avec une accréditation gérée par l'imbrication de groupes (stratégie AGDLP : <em>Accounts &gt; Global &gt; Domain Local &gt; Permissions</em>).</p>
+            <p>Il faut séparer rigoureusement les droits de partage réseau (ouverts au maximum) et les droits NTFS (qui filtrent réellement l'accès sur le système de fichiers).</p>
+
+            <h3>Méthode 1 : Interface Graphique</h3>
+            <h4>Étape A : Création des Groupes de Ressources (Domaine Local)</h4>
+            <ol>
+                <li>Ouvrez la console <strong>Utilisateurs et ordinateurs Active Directory</strong>.</li>
+                <li>Créez 4 nouveaux groupes de type <strong>Domaine local</strong> :
+                    <ul>
+                        <li><code>DL_Admin_Modif</code></li>
+                        <li><code>DL_Admin_Lecture</code></li>
+                        <li><code>DL_Tech_Modif</code></li>
+                        <li><code>DL_Tech_Lecture</code></li>
+                    </ul>
+                </li>
+                <li><strong>L'imbrication (Le cœur de l'AGDLP) :</strong> Double-cliquez sur <code>DL_Admin_Modif</code>, allez dans l'onglet <em>Membres</em>, cliquez sur <em>Ajouter</em> et intégrez le ou les groupes globaux concernés (ex: <code>GG_Direction</code>). Répétez l'opération pour associer vos groupes métiers aux accès Lecture ou Modification.</li>
+            </ol>
+
+            <h4>Étape B : Création et Partage Réseau</h4>
+            <ol>
+                <li>Créez vos dossiers sur le disque système.</li>
+                <li>Faites un clic droit sur le dossier &gt; <strong>Propriétés</strong> &gt; Onglet <strong>Partage</strong> &gt; <strong>Partage avancé...</strong></li>
+                <li>Cochez <strong>Partager ce dossier</strong>.</li>
+                <li>Cliquez sur le bouton <strong>Autorisations</strong>. Assurez-vous que l'utilisateur "Tout le monde" dispose du <strong>Contrôle Total</strong> (les restrictions se feront via NTFS).</li>
+            </ol>
+
+            <h4>Étape C : Sécurisation NTFS</h4>
+            <ol>
+                <li>Dans les propriétés du dossier, allez dans l'onglet <strong>Sécurité</strong> &gt; <strong>Avancé</strong>.</li>
+                <li>Cliquez sur le bouton <strong>Désactiver l'héritage</strong>, puis choisissez <strong>Convertir les autorisations héritées en autorisations explicites...</strong>.</li>
+                <li>Supprimez le groupe générique <strong>Utilisateurs</strong> (Users).</li>
+                <li>Ajoutez vos groupes de Domaine Local (ex: <code>DL_Admin_Modif</code>) et cochez les autorisations adéquates (ex: <strong>Modification</strong>).</li>
+            </ol>
+
+            <h3>Méthode 2 : Ligne de Commande / Script</h3>
+            <p>L'automatisation du processus est indispensable en environnement Server Core ou pour des déploiements massifs.</p>
+            
+            <h4>Étape A : Groupes de Ressources et Imbrication</h4>
+<pre><code class="language-powershell">$Dom = "DC=domaine-a,DC=local"
+
+# Création des Groupes de Domaine Local (-GroupScope DomainLocal)
+$DL_Groups = @("DL_Admin_Modif", "DL_Admin_Lecture")
+foreach ($DL in $DL_Groups) {
+    New-ADGroup -Name $DL -SamAccountName $DL -GroupCategory Security -GroupScope DomainLocal -Path "OU=Entreprise_A,$Dom"
+}
+
+# Imbrication AGDLP
+Add-ADGroupMember -Identity "DL_Admin_Modif" -Members "GG_Direction"
+Add-ADGroupMember -Identity "DL_Admin_Lecture" -Members "GG_Ventes", "GG_RH"</code></pre>
+
+            <h4>Étape B : Partage Réseau Ouvert et Droits NTFS</h4>
+            <p>L'outil natif <code>icacls</code> est la norme absolue en ligne de commande pour configurer des permissions NTFS strictes.</p>
+<pre><code class="language-powershell"># Création et Partage SMB
+New-Item -Path "C:\PartageAdmin" -ItemType Directory
+New-SmbShare -Name "Administratif" -Path "C:\PartageAdmin" -FullAccess "Everyone"
+
+# NTFS via icacls
+icacls "C:\PartageAdmin" /inheritance:d
+icacls "C:\PartageAdmin" /remove "Utilisateurs"
+icacls "C:\PartageAdmin" /remove "Users"
+
+icacls "C:\PartageAdmin" /grant "domaine-a\DL_Admin_Modif:(M)"
+icacls "C:\PartageAdmin" /grant "domaine-a\DL_Admin_Lecture:(RX)"</code></pre>
+        </section>
+
+        <section id="partie-5" class="section">
+            <h2>Partie 5 : Délégations de Contrôle</h2>
+            <p>La délégation de contrôle permet d'accorder des privilèges administratifs très spécifiques à certains groupes d'utilisateurs sans pour autant en faire des Administrateurs du domaine. Les bonnes pratiques recommandent l'utilisation de l'Assistant Délégation de contrôle ciblée sur des Unités d'Organisation.</p>
+
+            <h3>Méthode 1 : Interface Graphique</h3>
+            <ol>
+                <li>Ouvrez la console <strong>Utilisateurs et ordinateurs Active Directory</strong> (<code>dsa.msc</code>).</li>
+                <li>Faites un clic droit sur l'Unité d'Organisation (OU) cible (ex: <code>OU=Entreprise_A</code>) et cliquez sur <strong>Délégation de contrôle...</strong></li>
+                <li>L'assistant s'ouvre, cliquez sur <strong>Suivant</strong>.</li>
+                <li>Cliquez sur <strong>Ajouter</strong>, tapez le nom du groupe (ex: <code>GG_Equipe_Support</code>) et validez par OK.</li>
+                <li>Cochez les privilèges désirés, par exemple :
+                    <ul>
+                        <li><strong>Créer, supprimer et gérer les comptes d'utilisateurs</strong></li>
+                        <li><strong>Réinitialiser les mots de passe utilisateur</strong></li>
+                    </ul>
+                </li>
+                <li>Cliquez sur <strong>Suivant</strong> puis <strong>Terminer</strong>.</li>
+            </ol>
+
+            <h3>Méthode 2 : Ligne de commande (dsacls)</h3>
+            <p>Si vous devez le faire en ligne de commande pure (Server Core), vous devez utiliser l'outil système <code>dsacls</code> (qui manipule directement les listes de contrôle d'accès de l'annuaire).</p>
+<pre><code class="language-cmd">:: 1. Délégation sur la racine (Création/Suppression Utilisateurs + Groupes)
+:: CC = Create Child, DC = Delete Child, WP = Write Property
+dsacls "OU=Entreprise_A,DC=domaine-a,DC=local" /I:T /G "domaine-a\GG_Equipe_Support:CCDC;user"
+dsacls "OU=Entreprise_A,DC=domaine-a,DC=local" /I:T /G "domaine-a\GG_Equipe_Support:CCDC;group"
+
+:: 2. Délégation ciblée (Réinitialisation de mot de passe)
+:: CA = Control Access (Extended Right pour le Reset Password)
+dsacls "OU=Ventes,OU=Entreprise_A,DC=domaine-a,DC=local" /I:S /G "domaine-a\GG_Managers:CA;Réinitialiser le mot de passe;user"</code></pre>
+        </section>
+
+        <section id="partie-6" class="section">
+            <h2>Partie 6 : Stratégies de Groupes (GPO)</h2>
+            <p>Les stratégies de groupe (GPO) permettent de centraliser la configuration des postes clients et des restrictions utilisateurs pour optimiser les accès en entreprise.</p>
+
+            <h3>Méthode 1 : Interface Graphique</h3>
+            <p>Ouvrez la console <strong>Gestion de stratégie de groupe</strong> (<code>gpmc.msc</code>) depuis le menu Outils du Gestionnaire de serveur.</p>
+
+            <h4>Étape A : Restrictions globales (Registre et Écran de veille)</h4>
+            <ol>
+                <li>Faites un clic droit sur l'OU racine et choisissez <strong>Créer un objet GPO dans ce domaine, et le lier ici...</strong> Nommez-le <code>GPO_Restrictions_Globales</code>.</li>
+                <li>Faites un clic droit sur cette GPO &gt; <strong>Modifier</strong>.</li>
+                <li><strong>Écran de veille :</strong> Allez dans <em>Configuration utilisateur &gt; Stratégies &gt; Modèles d'administration &gt; Panneau de configuration &gt; Personnalisation</em>. Double-cliquez sur <strong>Empêcher la modification de l'écran de veille</strong>, cochez <strong>Activé</strong> et validez.</li>
+                <li><strong>Registre :</strong> Allez dans <em>Configuration utilisateur &gt; Stratégies &gt; Modèles d'administration &gt; Système</em>. Double-cliquez sur <strong>Empêcher l'accès aux outils de modification du Registre</strong>, cochez <strong>Activé</strong> et validez.</li>
+                <li><strong>Exclusion d'un groupe technique :</strong> Sélectionnez votre GPO. Allez dans l'onglet <strong>Délégation</strong>, puis cliquez sur <strong>Avancé</strong>. Ajoutez le groupe technique concerné. Dans la liste des autorisations, cherchez <strong>Appliquer la stratégie de groupe</strong> et cochez <strong>Refuser</strong>.</li>
+            </ol>
+
+            <h4>Étape B : Personnalisation et Déploiement</h4>
+            <p>Déployer des fonds d'écran ou des paramètres locaux est un cas d'usage fréquent.</p>
+            <ol>
+                <li>Modifiez votre GPO et allez dans <em>Configuration utilisateur &gt; Stratégies &gt; Modèles d'administration &gt; Bureau &gt; Bureau</em>. Double-cliquez sur <strong>Papier peint du bureau</strong>. Renseignez un chemin réseau de type <code>\\SRV-AD-01\Partages\wallpaper.jpg</code>.</li>
+                <li>Pour forcer l'ajout d'administrateurs locaux sur les postes clients, naviguez vers <em>Configuration ordinateur &gt; Préférences &gt; Paramètres du Panneau de configuration &gt; Utilisateurs et groupes locaux</em>, et ajoutez votre groupe AD dans le groupe local "Administrateurs".</li>
+            </ol>
+        </section>
+
+        <section id="partie-7" class="section">
+            <h2>Partie 7 : Relation d'Approbation</h2>
+            <p>La dernière étape consiste souvent à relier différentes entités. Les exigences de production demandent de mettre en place une relation d'approbation entre 2 domaines et de tester son bon fonctionnement. Les forêts doivent d'abord être capables de résoudre leurs noms DNS respectifs via des redirecteurs conditionnels.</p>
+
+            <h4>Étape A : Configuration DNS (Redirecteurs)</h4>
+            <p>Sur chaque serveur, vous devez créer un redirecteur pointant vers l'autre domaine.</p>
+<pre><code class="language-powershell">Add-DnsServerConditionalForwarderZone -Name "filiale-b.local" -MasterServers 192.168.x.x</code></pre>
+
+            <h4>Étape B : Création de la Relation d'Approbation</h4>
+            <ol>
+                <li>Ouvrez la console <strong>Domaines et approbations Active Directory</strong>.</li>
+                <li>Faites un clic droit sur votre domaine principal et sélectionnez <strong>Propriétés</strong>.</li>
+                <li>Allez dans l'onglet <strong>Approbations</strong> et cliquez sur le bouton <strong>Nouvelle approbation...</strong></li>
+                <li>Saisissez le nom du domaine cible (ex: <code>filiale-b.local</code>).</li>
+                <li>Sélectionnez <strong>Approbation de forêt</strong> puis <strong>Bidirectionnelle</strong>.</li>
+                <li>Sélectionnez <strong>Vers ce domaine et le domaine spécifié</strong> pour configurer les deux côtés en une seule opération (nécessite les identifiants administrateur du domaine distant).</li>
+                <li>Choisissez <strong>Authentification à l'échelle de la forêt</strong>. Confirmez les approbations.</li>
+            </ol>
+
+            <h4>Étape C : Test de la relation d'approbation</h4>
+            <p>Il est essentiel de tester son bon fonctionnement depuis un poste client (ex: <code>PC-Client-01</code>).</p>
+            <ol>
+                <li>Sur un poste intégré au domaine A, sur l'écran de connexion, choisissez <strong>Autre utilisateur</strong>.</li>
+                <li>Essayez d'ouvrir une session avec un compte appartenant à la filiale B (ex: <code>FILIALE-B\utilisateur</code>).</li>
+                <li>Si le bureau s'ouvre, l'authentification Kerberos inter-forêts est fonctionnelle.</li>
+            </ol>
+        </section>
+
+        <section id="partie-8" class="section">
+            <h2>Partie 8 : Étude de cas - Implémentation réelle</h2>
+            <p>Pour illustrer ce tutoriel dans un contexte concret, voici un exemple d'implémentation spécifique réalisé pour l'interconnexion d'un parc de loisirs (Le Pal) et d'une clinique vétérinaire externe.</p>
+            <p>Dans ce cas d'usage complexe :</p>
+            <ul>
+                <li>Le domaine principal (siège) s'appelait <code>Lepal2.local</code>, déployé sur un Windows Server 2022 (nommé <code>R501-W2022</code>) avec interface graphique.</li>
+                <li>Le domaine partenaire (clinique) s'appelait <code>Veto2.local</code>, déployé de manière durcie sur une infrastructure Server Core Windows 2019 (nommé <code>R501-W2019</code>).</li>
+            </ul>
+            <p>Une des particularités techniques de ce déploiement résidait dans la sécurisation des postes de la clinique. Une restriction horaire (LogonHours) stricte a été appliquée spécifiquement aux assistants vétérinaires. Étant donné l'absence d'interface graphique sur Server Core, la matrice de connexion a été injectée intégralement en PowerShell sous la forme d'un <strong>tableau d'octets binaire</strong> très précis (ex: bloquant les connexions nocturnes et le dimanche). Cette approche illustre parfaitement la nécessité d'automatiser et de scripter les configurations avancées pour garantir un déploiement sécurisé.</p>
+        </section>
+
+        <section id="scripts" class="section">
+            <h2>Téléchargement des Scripts</h2>
+            <p>Voici les scripts PowerShell génériques, formatés avec un bloc de variables clair au début. Vous pouvez les utiliser pour automatiser l'intégralité du déploiement.</p>
+
+            <div class="script-card">
+                <div class="script-header">
+                    <h3>01_Deploiement_AD.ps1</h3>
+                    <a href="#" class="btn-download" onclick="alert('Téléchargement fictif de 01_Deploiement_AD.ps1'); return false;">⬇ Télécharger</a>
+                </div>
+                <p>Ce script configure l'IP, renomme la machine et installe le contrôleur de domaine en une seule passe.</p>
+<pre><code class="language-powershell"># ==============================================================================
+# --- VARIABLES À MODIFIER ---
+# ==============================================================================
+$NomServeur      = "SRV-AD-01" 
+$IPServeur       = "192.168.1.10"
+$MasquePrefixe   = 24
+$Passerelle      = "192.168.1.1"
+$IP_DNS_Local    = "127.0.0.1"
+$NomDomaineAD    = "domaine-a.local"
+$MotDePasseDSRM  = "&lt;MotDePasseComplexe&gt;"
+# ==============================================================================
+
+Write-Host "1. Renommage du serveur en $NomServeur..." -ForegroundColor Cyan
+Rename-Computer -NewName $NomServeur
+
+Write-Host "2. Configuration de la carte réseau..." -ForegroundColor Cyan
+$Carte = Get-NetAdapter | Where-Object Status -eq "Up" | Select-Object -First 1
+New-NetIPAddress -InterfaceIndex $Carte.ifIndex -IPAddress $IPServeur -PrefixLength $MasquePrefixe -DefaultGateway $Passerelle
+Set-DnsClientServerAddress -InterfaceIndex $Carte.ifIndex -ServerAddresses $IP_DNS_Local
+
+Write-Host "3. Installation des binaires Active Directory..." -ForegroundColor Cyan
+Install-WindowsFeature -Name AD-Domain-Services -IncludeManagementTools
+
+Write-Host "4. Promotion du contrôleur de domaine (Redémarrage automatique)..." -ForegroundColor Cyan
+$SecurePwd = ConvertTo-SecureString $MotDePasseDSRM -AsPlainText -Force
+Install-ADDSForest -DomainName $NomDomaineAD -SafeModeAdministratorPassword $SecurePwd -InstallDns -Force</code></pre>
+            </div>
+
+            <div class="script-card">
+                <div class="script-header">
+                    <h3>02_Creation_Arborescence.ps1</h3>
+                    <a href="#" class="btn-download" onclick="alert('Téléchargement fictif de 02_Creation_Arborescence.ps1'); return false;">⬇ Télécharger</a>
+                </div>
+                <p>Ce script déploie les OUs, les groupes globaux et crée un utilisateur de test avec le mot de passe standardisé.</p>
+<pre><code class="language-powershell"># ==============================================================================
+# --- VARIABLES À MODIFIER ---
+# ==============================================================================
+$CheminAD           = "DC=domaine-a,DC=local"
+$MotDePasseUsers    = "&lt;MotDePasseComplexe&gt;"
+$NomOURacine        = "Entreprise_A"
+$ListePoles         = @("Ventes", "RH", "IT", "Direction")
+$ListeComites       = @("GG_Comite_Technique", "GG_Direction")
+# ==============================================================================
+
+$SecurePwd = ConvertTo-SecureString $MotDePasseUsers -AsPlainText -Force
+
+Write-Host "1. Création de l'OU Racine..." -ForegroundColor Cyan
+New-ADOrganizationalUnit -Name $NomOURacine -Path $CheminAD
+
+Write-Host "2. Création des Départements et Groupes Globaux..." -ForegroundColor Cyan
+foreach ($Pole in $ListePoles) {
+    $CheminOU = "OU=$NomOURacine,$CheminAD"
+    New-ADOrganizationalUnit -Name $Pole -Path $CheminOU
+    New-ADGroup -Name "GG_$Pole" -SamAccountName "GG_$Pole" -GroupCategory Security -GroupScope Global -Path "OU=$Pole,$CheminOU"
+}
+
+Write-Host "3. Création des groupes transverses (Comités)..." -ForegroundColor Cyan
+foreach ($Comite in $ListeComites) {
+    New-ADGroup -Name $Comite -SamAccountName $Comite -GroupCategory Security -GroupScope Global -Path "OU=$NomOURacine,$CheminAD"
+}
+
+Write-Host "4. Création d'un utilisateur de test..." -ForegroundColor Cyan
+New-ADUser -Name "Test User" -SamAccountName "tuser" -AccountPassword $SecurePwd -Enabled $true -Path "OU=IT,OU=$NomOURacine,$CheminAD"
+Add-ADGroupMember -Identity "GG_IT" -Members "tuser"</code></pre>
+            </div>
+
+            <div class="script-card">
+                <div class="script-header">
+                    <h3>03_Creation_Filiale_Horaires.ps1</h3>
+                    <a href="#" class="btn-download" onclick="alert('Téléchargement fictif de 03_Creation_Filiale_Horaires.ps1'); return false;">⬇ Télécharger</a>
+                </div>
+                <p>Ce script applique une matrice binaire exacte pour restreindre les connexions d'un groupe d'utilisateurs spécifique.</p>
+<pre><code class="language-powershell"># ==============================================================================
+# --- VARIABLES À MODIFIER ---
+# ==============================================================================
+$CheminAD           = "DC=filiale-b,DC=local"
+$MotDePasseUsers    = "&lt;MotDePasseComplexe&gt;"
+$NomOUFiliale       = "Filiale_B"
+$GroupesFiliale     = @("GG_Employes", "GG_Externes")
+$LoginExterne       = "pexterne"
+$NomExterne         = "Paul Externe"
+
+# Matrice Horaire (21 octets) : Lu-Ve 8h-12h/14h-19h et Sa 8h-12h/14h-16h
+[byte[]]$TableauHoraires = @(0, 0, 0, 0, 207, 7, 0, 207, 7, 0, 207, 7, 0, 207, 7, 0, 207, 7, 0, 207, 0)
+# ==============================================================================
+
+$SecurePwd = ConvertTo-SecureString $MotDePasseUsers -AsPlainText -Force
+
+Write-Host "1. Création arborescence et groupes..." -ForegroundColor Cyan
+New-ADOrganizationalUnit -Name $NomOUFiliale -Path $CheminAD
+foreach ($Grp in $GroupesFiliale) {
+    New-ADGroup -Name $Grp -SamAccountName $Grp -GroupCategory Security -GroupScope Global -Path "OU=$NomOUFiliale,$CheminAD"
+}
+
+Write-Host "2. Création de l'utilisateur Externe..." -ForegroundColor Cyan
+New-ADUser -Name $NomExterne -SamAccountName $LoginExterne -AccountPassword $SecurePwd -Enabled $true -Path "OU=$NomOUFiliale,$CheminAD"
+
+Write-Host "3. Application des LogonHours restrictifs..." -ForegroundColor Cyan
+Set-ADUser -Identity $LoginExterne -Replace @{logonHours=$TableauHoraires}
+
+Write-Host "4. Ajout de l'utilisateur aux groupes..." -ForegroundColor Cyan
+Add-ADGroupMember -Identity "GG_Externes" -Members $LoginExterne</code></pre>
+            </div>
+
+            <div class="script-card">
+                <div class="script-header">
+                    <h3>04_Partages_AGDLP.ps1</h3>
+                    <a href="#" class="btn-download" onclick="alert('Téléchargement fictif de 04_Partages_AGDLP.ps1'); return false;">⬇ Télécharger</a>
+                </div>
+                <p>Ce script crée l'OU ressources, les groupes de domaine local, les dossiers physiques, et déploie les partages réseaux.</p>
+<pre><code class="language-powershell"># ==============================================================================
+# --- VARIABLES À MODIFIER ---
+# ==============================================================================
+$CheminAD           = "DC=domaine-a,DC=local"
+$NomOURessources    = "Ressources_Partages"
+
+# Dossiers Physiques
+$DossierAdmin       = "C:\PartageAdmin"
+$NomPartageAdmin    = "Administratif"
+
+# Noms des groupes Domaine Local
+$DL_AdminM          = "DL_Admin_Modif"
+$DL_AdminL          = "DL_Admin_Lecture"
+# ==============================================================================
+
+Write-Host "1. Création de l'OU et des Groupes de Domaine Local..." -ForegroundColor Cyan
+New-ADOrganizationalUnit -Name $NomOURessources -Path $CheminAD
+$DL_Groups = @($DL_AdminM, $DL_AdminL)
+foreach ($DL in $DL_Groups) {
+    New-ADGroup -Name $DL -SamAccountName $DL -GroupCategory Security -GroupScope DomainLocal -Path "OU=$NomOURessources,$CheminAD"
+}
+
+Write-Host "2. Imbrication AGDLP (Groupes Globaux dans Domaine Local)..." -ForegroundColor Cyan
+Add-ADGroupMember -Identity $DL_AdminM -Members "GG_Direction"
+Add-ADGroupMember -Identity $DL_AdminL -Members "GG_Ventes", "GG_RH"
+
+Write-Host "3. Création des dossiers locaux..." -ForegroundColor Cyan
+New-Item -Path $DossierAdmin -ItemType Directory -Force
+
+Write-Host "4. Création des partages réseaux SMB avec accès total temporaire..." -ForegroundColor Cyan
+New-SmbShare -Name $NomPartageAdmin -Path $DossierAdmin -FullAccess "Everyone"
+
+Write-Host "NOTE : Modifiez la sécurité NTFS graphiquement via Propriétés > Sécurité > Avancé." -ForegroundColor Yellow</code></pre>
+            </div>
+
+            <div class="script-card">
+                <div class="script-header">
+                    <h3>05_Creation_Utilisateurs_CSV.ps1</h3>
+                    <a href="#" class="btn-download" onclick="alert('Téléchargement fictif de 05_Creation_Utilisateurs_CSV.ps1'); return false;">⬇ Télécharger</a>
+                </div>
+                <p>Ce script lit un fichier CSV contenant la liste de tous les employés et les crée automatiquement avec un mot de passe standardisé.</p>
+<pre><code class="language-powershell"># ==============================================================================
+# --- VARIABLES À MODIFIER ---
+# ==============================================================================
+# Chemin vers votre fichier CSV contenant les utilisateurs
+$CheminFichierCSV   = "C:\Scripts\utilisateurs.csv"
+
+# Mot de passe imposé par les exigences de production
+$MotDePasseUsers    = "&lt;MotDePasseComplexe&gt;" 
+
+# Racine de votre domaine
+$DomaineAD          = "DC=domaine-a,DC=local"
+$SuffixeUPN         = "@domaine-a.local"
+# ==============================================================================
+
+&lt;# 
+EXEMPLE DE STRUCTURE DU FICHIER utilisateurs.csv :
+Prenom,Nom,Login,Pole,Groupe
+Jean,Dupont,jdupont,Ventes,GG_Ventes
+Marc,Admin,madmin,IT,GG_IT
+#&gt;
+
+Write-Host "1. Conversion du mot de passe en chaîne sécurisée..." -ForegroundColor Cyan
+$SecurePwd = ConvertTo-SecureString $MotDePasseUsers -AsPlainText -Force
+
+Write-Host "2. Lecture du fichier CSV..." -ForegroundColor Cyan
+if (!(Test-Path $CheminFichierCSV)) {
+    Write-Host "ERREUR : Le fichier $CheminFichierCSV est introuvable." -ForegroundColor Red
+    return
+}
+$ListeUtilisateurs = Import-Csv -Path $CheminFichierCSV -Delimiter ","
+
+Write-Host "3. Création des utilisateurs en cours..." -ForegroundColor Cyan
+foreach ($User in $ListeUtilisateurs) {
+    
+    $CheminOU = "OU=$($User.Pole),OU=Entreprise_A,$DomaineAD"
+    $NomComplet = "$($User.Prenom) $($User.Nom)"
+    
+    Write-Host " -&gt; Création de $NomComplet ($($User.Login))..." -NoNewline
+
+    try {
+        New-ADUser -Name $NomComplet `
+                   -GivenName $User.Prenom `
+                   -Surname $User.Nom `
+                   -SamAccountName $User.Login `
+                   -UserPrincipalName "$($User.Login)$SuffixeUPN" `
+                   -AccountPassword $SecurePwd `
+                   -Enabled $true `
+                   -Path $CheminOU
+
+        Add-ADGroupMember -Identity $User.Groupe -Members $User.Login
+        
+        Write-Host " [OK]" -ForegroundColor Green
+    }
+    catch {
+        Write-Host " [ERREUR]" -ForegroundColor Red
+    }
+}</code></pre>
+            </div>
+        </section>
+    </main>
+
+    <!-- Prism.js for Syntax Highlighting -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-powershell.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-batch.min.js"></script>
+    
+    <script src="script.js"></script>
+</body>
+</html>
